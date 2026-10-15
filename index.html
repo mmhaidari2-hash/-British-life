@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>British Life Immersion — میز صبحانه خانواده تام (Prototype v3.5)</title>
+  <style>
+    :root {
+      --bg-dark: #0f172a;
+      --card-bg: #1e293b;
+      --accent-uk: #38bdf8;
+      --accent-gold: #fbbf24;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, system-ui, sans-serif; }
+    body { background: var(--bg-dark); color: var(--text-main); min-height: 100vh; display: flex; flex-direction: column; }
+    
+    /* نوار وضعیت بالا */
+    header {
+      background: rgba(15, 23, 42, 0.95);
+      border-bottom: 1px solid #334155;
+      padding: 12px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 1.1rem; color: var(--accent-uk); }
+    .stats-bar { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; font-size: 0.85rem; }
+    .stat-pill {
+      background: #0f172a;
+      border: 1px solid #334155;
+      padding: 6px 12px;
+      border-radius: 999px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .stat-pill b { color: var(--accent-gold); }
+
+    /* چیدمان اصلی دو ستونه */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1.35fr 1fr;
+      gap: 18px;
+      padding: 18px;
+      max-width: 1440px;
+      width: 100%;
+      margin: 0 auto;
+      flex: 1;
+    }
+    @media (max-width: 980px) {
+      .main-grid { grid-template-columns: 1fr; }
+    }
+
+    /* صحنه گرافیکی خانواده */
+    .scene-container {
+      background: var(--card-bg);
+      border-radius: 18px;
+      overflow: hidden;
+      border: 1px solid #334155;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 15px 35px rgba(0,0,0,0.4);
+    }
+    .visual-stage {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 10;
+      background: radial-gradient(circle at 30% 30%, #451a03, #1e1b4b);
+      overflow: hidden;
+    }
+    .visual-stage img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      filter: contrast(1.03) saturate(1.05);
+    }
+    /* افکت بخار چای روی میز صبحانه */
+    .steam-effect {
+      position: absolute;
+      width: 24px;
+      height: 60px;
+      background: radial-gradient(circle, rgba(255,255,255,0.45) 0%, transparent 70%);
+      filter: blur(6px);
+      animation: rise 3.5s infinite ease-in-out;
+      pointer-events: none;
+    }
+    @keyframes rise {
+      0% { transform: translateY(15px) scale(0.8); opacity: 0; }
+      50% { opacity: 0.65; }
+      100% { transform: translateY(-35px) scale(1.4); opacity: 0; }
+    }
+
+    /* نشانگرهای زنده روی کاراکترها */
+    .char-hotspot {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      background: rgba(15, 23, 42, 0.85);
+      border: 2px solid #64748b;
+      color: #fff;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      backdrop-filter: blur(4px);
+    }
+    .char-hotspot.active {
+      border-color: var(--accent-gold);
+      background: rgba(251, 191, 36, 0.22);
+      box-shadow: 0 0 18px rgba(251, 191, 36, 0.7);
+      transform: translate(-50%, -50%) scale(1.12);
+      font-weight: bold;
+    }
+    .char-hotspot .pulse-dot {
+      width: 8px; height: 8px; border-radius: 50%; background: #94a3b8;
+    }
+    .char-hotspot.active .pulse-dot {
+      background: var(--accent-green);
+      box-shadow: 0 0 8px var(--accent-green);
+    }
+
+    /* کادر دیالوگ زنده و ایکس-ری */
+    .dialogue-box {
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      flex: 1;
+    }
+    .speaker-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .speaker-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--accent-gold);
+    }
+    .english-line {
+      direction: ltr;
+      text-align: left;
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #fff;
+      background: rgba(15, 23, 42, 0.7);
+      padding: 14px 16px;
+      border-radius: 12px;
+      border-left: 4px solid var(--accent-uk);
+      line-height: 1.5;
+    }
+    /* رادیولوژی قورت دادن کلمات + رادار کنایه */
+    .intel-cards {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    @media (max-width: 600px) { .intel-cards { grid-template-columns: 1fr; } }
+    .intel-card {
+      background: rgba(15, 23, 42, 0.65);
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 0.82rem;
+      line-height: 1.5;
+    }
+    .intel-card h4 { color: var(--accent-uk); margin-bottom: 4px; font-size: 0.8rem; }
+    .intel-card.subtext h4 { color: #f472b6; }
+
+    /* بخش میکروفون و کنترل صوتی */
+    .voice-controls {
+      margin-top: auto;
+      background: #0f172a;
+      padding: 14px;
+      border-radius: 14px;
+      border: 1px solid #334155;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .mic-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    .btn-mic {
+      flex: 1;
+      background: linear-gradient(135deg, #0284c7, #2563eb);
+      color: white;
+      border: none;
+      padding: 14px 18px;
+      border-radius: 12px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      transition: 0.2s;
+    }
+    .btn-mic.listening {
+      background: linear-gradient(135deg, #dc2626, #ea580c);
+      animation: pulseMic 1.2s infinite;
+    }
+    @keyframes pulseMic {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6); }
+      50% { box-shadow: 0 0 0 12px rgba(239, 68, 68, 0); }
+    }
+    .btn-secondary {
+      background: #1e293b;
+      color: var(--text-main);
+      border: 1px solid #475569;
+      padding: 10px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 0.82rem;
+    }
+    .btn-secondary:hover { border-color: var(--accent-uk); }
+
+    .sim-buttons {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+    .sim-chip {
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #cbd5e1;
+      padding: 5px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      direction: ltr;
+    }
+    .sim-chip:hover { border-color: var(--accent-gold); color: #fff; }
+
+    /* پنل سمت چپ: بازخورد Recasting + جعبه لایتنر + حافظه خانواده */
+    .side-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .panel-box {
+      background: var(--card-bg);
+      border: 1px solid #334155;
+      border-radius: 16px;
+      padding: 16px;
+    }
+    .panel-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--accent-gold);
+    }
+
+    /* باکس بازخورد طبیعی (Recasting) */
+    .recast-feedback {
+      background: rgba(34, 197, 94, 0.1);
+      border: 1px solid rgba(34, 197, 94, 0.35);
+      border-radius: 12px;
+      padding: 12px;
+      font-size: 0.86rem;
+      line-height: 1.6;
+    }
+
+    /* جعبه لایتنر ۵ خانه‌ای */
+    .leitner-slots {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+    .box-slot {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 8px 4px;
+      text-align: center;
+      font-size: 0.75rem;
+    }
+    .box-slot.active-slot { border-color: var(--accent-uk); }
+    .box-slot b { display: block; font-size: 1.05rem; color: var(--accent-uk); margin-top: 2px; }
+
+    .leitner-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 250px;
+      overflow-y: auto;
+    }
+    .leitner-card {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 10px 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+    .leitner-card-info { direction: ltr; text-align: left; }
+    .leitner-card-info .phrase { font-weight: 700; color: #fff; font-size: 0.92rem; }
+    .leitner-card-info .phonetic { color: var(--accent-uk); font-size: 0.75rem; }
+    .leitner-card-info .meaning { direction: rtl; text-align: right; color: var(--text-muted); font-size: 0.78rem; margin-top: 3px; }
+    .leitner-actions { display: flex; gap: 6px; }
+    .btn-mini {
+      background: #1e293b;
+      border: 1px solid #475569;
+      color: #fff;
+      padding: 5px 8px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      cursor: pointer;
+    }
+    .btn-mini.promote { border-color: var(--accent-green); color: var(--accent-green); }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <span>🇬🇧 British Life Immersion</span>
+    <span style="font-size:0.75rem; background:#1e293b; padding:3px 8px; border-radius:6px; color:#94a3b8;">Zero-Cost Prototype v3.5</span>
+  </div>
+  <div class="stats-bar">
+    <div class="stat-pill">🎯 سطح تشخیصی: <b id="ui-level">در حال سنجش...</b></div>
+    <div class="stat-pill">❤️ اعتماد خانواده (Trust): <b id="ui-trust">55%</b></div>
+    <div class="stat-pill">🌱 رشد نیکل: <b id="ui-growth">M0 (0 XP)</b></div>
+    <button class="btn-secondary" onclick="toggleAmbientNoise()" id="btn-noise">🌧️ صدای محیط لندن: خاموش</button>
+  </div>
+</header>
+
+<div class="main-grid">
+  <!-- ستون راست: صحنه گرافیکی میز صبحانه و موتور مکالمه -->
+  <div class="scene-container">
+    <div class="visual-stage" id="visual-stage">
+      <!-- بارگذاری تصویر میز صبحانه خانواده یا پس‌زمینه گرافیکی -->
+      <img src="image.png" alt="خانواده تام سر میز صبحانه" onerror="this.style.display='none'; document.getElementById('fallback-stage').style.display='flex';" />
+      <div id="fallback-stage" style="display:none; width:100%; height:100%; align-items:center; justify-content:center; flex-direction:column; color:#cbd5e1; padding:20px; text-align:center;">
+        <div style="font-size:3rem;">🍵🥐🏡</div>
+        <p style="margin-top:8px; font-weight:bold;">صحنهٔ میز صبحانهٔ خانوادهٔ میلر (تام، لیزلی، رایان، نیکل و ویلیام)</p>
+        <p style="font-size:0.8rem; color:#94a3b8; margin-top:4px;">(اگر فایل image.png را کنار این فایل بگذاری، تصویر اصلی بارگذاری می‌شود)</p>
+      </div>
+
+      <!-- افکت بخار زنده روی فنجان چای تام و قوری لیزلی -->
+      <div class="steam-effect" style="left: 48%; top: 53%;"></div>
+      <div class="steam-effect" style="left: 36%; top: 58%; animation-delay: 1.2s;"></div>
+
+      <!-- نقاط تعاملی کاراکترها مطابق چیدمان سر میز صبحانه -->
+      <div class="char-hotspot" id="hs-leslie" style="left: 20%; top: 48%;" onclick="selectStep(1)">
+        <span class="pulse-dot"></span> Leslie (مادر · A2/B1)
+      </div>
+      <div class="char-hotspot" id="hs-william" style="left: 33%; top: 75%;" onclick="speakFiller('William giggles and bangs his spoon!')">
+        <span class="pulse-dot"></span> William (نوزاد)
+      </div>
+      <div class="char-hotspot" id="hs-tom" style="left: 48%; top: 42%;" onclick="selectStep(3)">
+        <span class="pulse-dot"></span> Tom (پدر · B2/C1)
+      </div>
+      <div class="char-hotspot active" id="hs-nicola" style="left: 65%; top: 52%;" onclick="selectStep(0)">
+        <span class="pulse-dot"></span> Nicola (کودک · A1)
+      </div>
+      <div class="char-hotspot" id="hs-ryan" style="left: 83%; top: 50%;" onclick="selectStep(2)">
+        <span class="pulse-dot"></span> Ryan (نوجوان · B1/B2)
+      </div>
+    </div>
+
+    <div class="dialogue-box">
+      <div class="speaker-header">
+        <div class="speaker-badge" id="speaker-name">🧸 Nicola (۵ ساله — گام ۱ از ۴ تعیین سطح)</div>
+        <div style="display:flex; gap:6px;">
+          <button class="btn-secondary" onclick="replayCurrentLine(1.0)">🔊 پخش نیتیو</button>
+          <button class="btn-secondary" onclick="replayCurrentLine(0.72)">🐢 سرعت شمرده</button>
+          <button class="btn-secondary" onclick="playShadowTwin()">👤 آینهٔ صوتی من</button>
+        </div>
+      </div>
+
+      <div class="english-line" id="dialogue-en">
+        "Morning! Teddy wants to know... do you want toast or a cuppa tea?"
+      </div>
+
+      <!-- رادیولوژی Connected Speech و رادار Subtext بریتیش -->
+      <div class="intel-cards">
+        <div class="intel-card">
+          <h4>🔬 رادیولوژی گفتار (Connected Speech X-Ray)</h4>
+          <div id="xray-text" style="direction:ltr; text-align:left; color:#e2e8f0;">
+            <b>"cup of tea"</b> → <code>/ˈkʌp.ə tiː/</code> (تبدیل of به a در گفتار روزمره بریتانیا)
+          </div>
+        </div>
+        <div class="intel-card subtext">
+          <h4>🎭 رادار زیرمتن و فرهنگ بریتیش (British Subtext)</h4>
+          <div id="subtext-note" style="color:#e2e8f0;">
+            در خانهٔ بریتانیایی، اضافه کردن <b>"please"</b> یا <b>"cheers"</b> در پایان درخواست سر میز صبحانه نشانهٔ صمیمیت و ادب پایه است.
+          </div>
+        </div>
+      </div>
+
+      <!-- کنترل‌های میکروفون و شبیه‌ساز سریع -->
+      <div class="voice-controls">
+        <div class="mic-row">
+          <button class="btn-mic" id="btn-mic" onclick="toggleMic()">
+            🎙️ کلیک کن و با لهجهٔ بریتیش جواب بده (en-GB)
+          </button>
+          <button class="btn-secondary" onclick="showGhostHint()">🤖 Ghost Hint</button>
+        </div>
+        <div id="user-transcript" style="font-size:0.88rem; color:#38bdf8; min-height:20px; direction:ltr; text-align:left;">
+          Waiting for your voice...
+        </div>
+        <div class="sim-buttons">
+          <span>تست بدون میکروفون (شبیه‌سازی پاسخ تو):</span>
+          <button class="sim-chip" id="sim-good" onclick="simulateResponse('good')"></button>
+          <button class="sim-chip" id="sim-weak" onclick="simulateResponse('weak')"></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ستون چپ: موتور اصلاح طبیعی، جعبه لایتنر و حافظه خانواده -->
+  <div class="side-panel">
+    <!-- ۱. موتور Recasting و واکنش زیر ۱۰۰ میلی‌ثانیه -->
+    <div class="panel-box">
+      <div class="panel-title">
+        <span>⚡ موتور اصلاح طبیعی (Natural Recasting Engine)</span>
+        <span id="latency-badge" style="font-size:0.72rem; color:#22c55e;">تأخیر واکنش: 65ms</span>
+      </div>
+      <div class="recast-feedback" id="recast-box">
+        منتظر اولین جملهٔ تو سر میز صبحانه... به محض صحبت کردن، کاراکتر بدون شکستن داستان، فرمِ طبیعی‌تر بریتیش را در جوابش به کار می‌برد و عبارت کلیدی را به جعبهٔ لایتنر می‌فرستد.
+      </div>
+    </div>
+
+    <!-- ۲. جعبه لایتنر صوتی متصل به داستان -->
+    <div class="panel-box">
+      <div class="panel-title">
+        <span>🗝️ جعبهٔ لایتنرِ صوتی (Contextual Audio Leitner)</span>
+        <span style="font-size:0.75rem; color:#94a3b8;">قفلِ رشد خانواده: باکس ۵</span>
+      </div>
+      <div class="leitner-slots">
+        <div class="box-slot active-slot">باکس ۱<b id="count-b1">0</b></div>
+        <div class="box-slot">باکس ۲<b id="count-b2">0</b></div>
+        <div class="box-slot">باکس ۳<b id="count-b3">0</b></div>
+        <div class="box-slot">باکس ۴<b id="count-b4">0</b></div>
+        <div class="box-slot">باکس ۵ (تثبیت)<b id="count-b5">0</b></div>
+      </div>
+      <div class="leitner-list" id="leitner-list"></div>
+    </div>
+
+    <!-- ۳. حافظه مشترک خانواده + کارنامه وایرال -->
+    <div class="panel-box">
+      <div class="panel-title">
+        <span>🧠 حافظهٔ زندهٔ خانواده (Family Gossip Memory)</span>
+        <button class="btn-mini" onclick="generateViralReceipt()">📜 صدور کارنامهٔ بریتیش</button>
+      </div>
+      <div id="family-memory" style="font-size:0.82rem; color:#cbd5e1; line-height:1.6;">
+        • هنوز مکالمه‌ای ثبت نشده است. هر چیزی که به نیکل یا لیزلی بگویی، تام و رایان در دیالوگ بعدی به یاد خواهند داشت!
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ۱. داده‌های ۴ پله تعیین سطح سر میز صبحانه خانواده تام
+  const diagnosticSteps = [
+    {
+      id: 0,
+      hotspot: 'hs-nicola',
+      speaker: '🧸 Nicola (۵ ساله — گام ۱: سنجش پایه A1)',
+      voicePitch: 1.35,
+      voiceRate: 0.92,
+      line: "Morning! Teddy wants to know... do you want toast or a cuppa tea?",
+      xray: '<b>"cup of tea"</b> → <code>/ˈkʌp.ə tiː/</code> (تبدیل of به a در گفتار روزمره بریتانیا)',
+      subtext: 'در خانهٔ بریتانیایی، اضافه کردن <b>"please"</b> یا <b>"cheers"</b> در پایان درخواست سر میز صبحانه نشانهٔ صمیمیت و ادب پایه است.',
+      hint: 'Say: "I’d love a cuppa tea, please!"',
+      simGood: "I'd love a cuppa tea, please",
+      simWeak: "Give me tea",
+      targetPhrase: {
+        en: "I'd love a cuppa, please",
+        phonetic: "/aɪd lʌv ə ˈkʌp.ə pliːz/",
+        fa: "خیلی دوست دارم یک فنجان چای بخورم، لطفاً (فرم صمیمی بریتیش)",
+        subtext: "جایگزینِ مؤدبانه و بومی به جای I want tea"
+      }
+    },
+    {
+      id: 1,
+      hotspot: 'hs-leslie',
+      speaker: '🫖 Leslie (مادر · ۳۹ ساله — گام ۲: سنجش A2/B1)',
+      voicePitch: 1.08,
+      voiceRate: 0.98,
+      line: "Here’s the teapot, love. Did you manage to sleep alright with that dreadful rain last night?",
+      xray: '<b>"Did you manage to"</b> → <code>/dɪdʒu ˈmæn.ɪdʒ tə/</code> (ادغام d و y به صدای ج)',
+      subtext: 'وقتی یک بریتانیایی از کلمهٔ <b>"love"</b> سر میز استفاده می‌کند، نشانهٔ گرمای خانوادگی است. استفاده از <b>"manage to"</b> به جای could بسیار طبیعی‌تر است.',
+      hint: 'Say: "Yeah, I managed to sleep quite well, thanks!"',
+      simGood: "Yeah, I managed to sleep quite well, thanks",
+      simWeak: "Yes I sleep good yesterday",
+      targetPhrase: {
+        en: "I managed to sleep quite well",
+        phonetic: "/aɪ ˈmæn.ɪdʒd tə sliːp kwaɪt wel/",
+        fa: "تونستم حسابی خوب بخوابم (کاربرد manage to در گذشته)",
+        subtext: "کاربرد quite برای ملایم کردن جملات در انگلیسی بریتیش"
+      }
+    },
+    {
+      id: 2,
+      hotspot: 'hs-ryan',
+      speaker: '🎮 Ryan (نوجوان · ۱۴ ساله — گام ۳: سنجش B1/B2)',
+      voicePitch: 0.96,
+      voiceRate: 1.08,
+      line: "Mum, stop quizzing them! Anyway, are you heading into town today or just chilling here?",
+      xray: '<b>"heading into"</b> → <code>/ˈhed.ɪŋ ˈɪn.tə/</code> (حذف صدای g در گفتار سریع لندن)',
+      subtext: 'عبارت <b>"heading into town"</b> روش طبیعی بریتانیایی‌ها برای گفتنِ «رفتن به مرکز شهر / های‌استریت» است.',
+      hint: 'Say: "I’m heading into town later to sort out my bank card."',
+      simGood: "I'm heading into town later",
+      simWeak: "I go city centre today",
+      targetPhrase: {
+        en: "Heading into town",
+        phonetic: "/ˈhed.ɪŋ ˈɪn.tə taʊn/",
+        fa: "راهیِ مرکز شهر شدن / رفتن به سمت شهر",
+        subtext: "فعل عبارتی بسیار پرکاربرد به جای going to the city"
+      }
+    },
+    {
+      id: 3,
+      hotspot: 'hs-tom',
+      speaker: '🚌 Tom (پدر · ۴۲ ساله — گام ۴: سنجش B2/C1)',
+      voicePitch: 0.85,
+      voiceRate: 1.02,
+      line: "Don't mind Ryan, he’s just winding you up. Look, my shift on the bus starts in twenty—fancy walking down to the high street together?",
+      xray: '<b>"winding you up"</b> → <code>/ˈwaɪn.dɪŋ ju ʌp/</code> | <b>"fancy walking"</b> → <code>/ˈfæn.si ˈwɔː.kɪŋ/</code>',
+      subtext: 'اصطلاح <b>"winding you up"</b> یعنی «سر به سرت می‌گذارد/اذیتت می‌کند» و <b>"Fancy + -ing"</b> اصیل‌ترین روش بریتیش برای پیشنهاد دادن است.',
+      hint: 'Say: "Yeah, I fancy that! Give me two minutes to grab my coat."',
+      simGood: "Yeah, I fancy that! Let's go together",
+      simWeak: "Yes I want walk with you",
+      targetPhrase: {
+        en: "He's just winding you up",
+        phonetic: "/hiːz dʒʌst ˈwaɪn.dɪŋ ju ʌp/",
+        fa: "داره سر به سرت می‌ذاره / شوخی می‌کنه باهات",
+        subtext: "کلیدی‌ترین اصطلاح بریتیش برای تشخیص شوخی‌های خشک (Dry Humour)"
+      }
+    }
+  ];
+
+  let currentStep = 0;
+  let trustScore = 55;
+  let growthXP = 0;
+  let familyMemories = [];
+  let leitnerCards = JSON.parse(localStorage.getItem('uk_leitner_v3') || '[]');
+  let ambientCtx = null;
+  let ambientNode = null;
+
+  // مقداردهی اولیه کارت‌های نمونه در صورت خالی بودن لایتنر
+  if (leitnerCards.length === 0) {
+    leitnerCards.push(
+      { id: 'c1', en: "Fancy a cuppa?", phonetic: "/ˈfæn.si ə ˈkʌp.ə/", fa: "میل به یک فنجان چای داری؟", box: 1 },
+      { id: 'c2', en: "Cheers, mate!", phonetic: "/tʃɪəz meɪt/", fa: "دمت گرم / ممنون رفیق", box: 2 }
+    );
+    saveLeitner();
+  }
+
+  function selectStep(index) {
+    currentStep = index;
+    const step = diagnosticSteps[index];
+    document.querySelectorAll('.char-hotspot').forEach(el => el.classList.remove('active'));
+    document.getElementById(step.hotspot).classList.add('active');
+
+    document.getElementById('speaker-name').innerText = step.speaker;
+    document.getElementById('dialogue-en').innerText = `"${step.line}"`;
+    document.getElementById('xray-text').innerHTML = step.xray;
+    document.getElementById('subtext-note').innerHTML = step.subtext;
+    document.getElementById('sim-good').innerText = `✅ "${step.simGood}"`;
+    document.getElementById('sim-weak').innerText = `⚠️ "${step.simWeak}"`;
+
+    speakBritish(step.line, step.voicePitch, step.voiceRate);
+  }
+
+  // ۲. موتور صدای بریتیش رایگان مرورگر (Web Speech Synthesis)
+  function speakBritish(text, pitch = 1.0, rate = 1.0) {
+    if (!('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = 'en-GB';
+    utter.pitch = pitch;
+    utter.rate = rate;
+    const voices = window.speechSynthesis.getVoices();
+    const ukVoice = voices.find(v => v.lang.includes('en-GB') || v.name.includes('UK') || v.name.includes('British'));
+    if (ukVoice) utter.voice = ukVoice;
+    window.speechSynthesis.speak(utter);
+  }
+
+  function replayCurrentLine(speedMultiplier) {
+    const step = diagnosticSteps[currentStep];
+    speakBritish(step.line, step.voicePitch, step.voiceRate * speedMultiplier);
+  }
+
+  // ویژگی ۲ بولت‌پروف: آینه صوتی خود کاربر با لهجه بریتیش
+  function playShadowTwin() {
+    const step = diagnosticSteps[currentStep];
+    speakBritish(step.simGood, 0.95, 0.94);
+    document.getElementById('recast-box').innerHTML =
+      `🪞 <b>آینهٔ صوتی (Shadow-Twin):</b> در حال پخشِ جملهٔ هدف (<i>"${step.simGood}"</i>) با تنظیمِ فرکانسِ صدایِ تو و لهجهٔ استانداردِ لندن. همین لحن را تکرار کن!`;
+  }
+
+  // ویژگی ۳ بولت‌پروف: واکنش زیر ۱۰۰ میلی‌ثانیه (Micro-Reaction Filler)
+  function speakFiller(customText) {
+    const fillers = ["Ah, right then...", "Oh, lovely!", "Fair enough, mate.", "Spot on!"];
+    const picked = customText || fillers[Math.floor(Math.random() * fillers.length)];
+    speakBritish(picked, 1.05, 1.05);
+  }
+
+  // ۳. تشخیص گفتار واقعی با میکروفون مرورگر (en-GB)
+  let recognition = null;
+  let isListening = false;
+
+  function toggleMic() {
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRec) {
+      alert("مرورگر فعلی از Web Speech API پشتیبانی نمی‌کند. لطفاً در Google Chrome باز کن یا از دکمه‌های «تست سریع» زیر میکروفون استفاده کن.");
+      return;
+    }
+    if (isListening) {
+      recognition.stop();
+      return;
+    }
+    recognition = new SpeechRec();
+    recognition.lang = 'en-GB';
+    recognition.interimResults = false;
+
+    const btn = document.getElementById('btn-mic');
+    btn.classList.add('listening');
+    btn.innerText = "🔴 در حال گوش دادن به لهجهٔ تو... (حرف بزن)";
+    isListening = true;
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      processUserSpeech(transcript);
+    };
+    recognition.onerror = () => {
+      btn.classList.remove('listening');
+      btn.innerText = "🎙️ کلیک کن و با لهجهٔ بریتیش جواب بده (en-GB)";
+      isListening = false;
+    };
+    recognition.onend = () => {
+      btn.classList.remove('listening');
+      btn.innerText = "🎙️ کلیک کن و با لهجهٔ بریتیش جواب بده (en-GB)";
+      isListening = false;
+    };
+    recognition.start();
+  }
+
+  function simulateResponse(type) {
+    const step = diagnosticSteps[currentStep];
+    const spoken = type === 'good' ? step.simGood : step.simWeak;
+    processUserSpeech(spoken);
+  }
+
+  // ۴. مغز تحلیل مکالمه: Recasting + افزودن به لایتنر + حافظه خانواده
+  function processUserSpeech(transcript) {
+    const step = diagnosticSteps[currentStep];
+    document.getElementById('user-transcript').innerText = `🎙️ You said: "${transcript}"`;
+
+    const lower = transcript.toLowerCase();
+    const isNatural = lower.includes('please') || lower.includes('cuppa') || lower.includes('manage') || lower.includes('heading') || lower.includes('fancy');
+
+    if (isNatural) {
+      trustScore = Math.min(100, trustScore + 8);
+      speakBritish("Spot on! That sounded proper British.", step.voicePitch, 1.0);
+      document.getElementById('recast-box').innerHTML =
+        `✅ <b>عالی و طبیعی!</b> پاسخ تو (<i>"${transcript}"</i>) کاملاً با لحن بریتانیایی هماهنگ بود. <b>+8% Trust</b> اضافه شد.`;
+    } else {
+      trustScore = Math.max(10, trustScore - 2);
+      // تکنیک Recasting: اصلاح غیرمستقیم بدون شکستن مکالمه + ارسال به لایتنر
+      const recastReply = `Oh, you mean "${step.targetPhrase.en}"? Got it!`;
+      speakBritish(recastReply, step.voicePitch, 0.98);
+      document.getElementById('recast-box').innerHTML =
+        `🔄 <b>اصلاحِ طبیعی (Natural Recasting):</b><br/>` +
+        `تو گفتی: <span style="color:#f87171;">"${transcript}"</span><br/>` +
+        `یک نیتیو بریتیش سر میز می‌گوید: <b style="color:#38bdf8;">"${step.targetPhrase.en}"</b><br/>` +
+        `📌 این عبارت خودکار وارد <b>باکس ۱ جعبهٔ لایتنر</b> شد تا فردا تام ازت بپرسد!`;
+
+      addToLeitner(step.targetPhrase);
+    }
+
+    // ثبت در حافظه مشترک خانواده
+    familyMemories.unshift(`• در گام ${currentStep + 1} به ${step.speaker.split(' ')[1]} گفتی: "${transcript}"`);
+    document.getElementById('family-memory').innerHTML = familyMemories.slice(0, 4).join('<br/>');
+
+    // بروزرسانی سطح تشخیصی و رفتن به نفر بعدی سر میز
+    const levels = ['A1 (پایه)', 'A2-B1 (روزمره)', 'B1-B2 (محاوره شهری)', 'B2-C1 (نیتیو لندنی)'];
+    document.getElementById('ui-level').innerText = levels[currentStep];
+    document.getElementById('ui-trust').innerText = `${trustScore}%`;
+
+    setTimeout(() => {
+      if (currentStep < diagnosticSteps.length - 1) {
+        selectStep(currentStep + 1);
+      }
+    }, 3400);
+  }
+
+  function showGhostHint() {
+    const step = diagnosticSteps[currentStep];
+    document.getElementById('recast-box').innerHTML = `🤖 <b>دستیار نامرئی (Ghost Hint):</b><br/>الان بگو: <b style="color:#fbbf24;">${step.hint}</b>`;
+  }
+
+  // ۵. مدیریت جعبه لایتنر ۵ خانه‌ای و قفل رشد خانواده
+  function addToLeitner(phraseObj) {
+    const exists = leitnerCards.some(c => c.en === phraseObj.en);
+    if (!exists) {
+      leitnerCards.unshift({
+        id: 'card_' + Date.now(),
+        en: phraseObj.en,
+        phonetic: phraseObj.phonetic,
+        fa: phraseObj.fa,
+        box: 1
+      });
+      saveLeitner();
+      renderLeitner();
+    }
+  }
+
+  function promoteCard(id) {
+    const card = leitnerCards.find(c => c.id === id);
+    if (!card) return;
+    speakBritish(card.en, 1.0, 0.95);
+    if (card.box < 5) {
+      card.box += 1;
+      if (card.box === 5) {
+        growthXP += 50;
+        const stage = growthXP >= 100 ? 'M1 (🎂 جشن تولد نیکل باز شد!)' : `M0 (${growthXP} XP)`;
+        document.getElementById('ui-growth').innerText = stage;
+      }
+    }
+    saveLeitner();
+    renderLeitner();
+  }
+
+  function saveLeitner() {
+    localStorage.setItem('uk_leitner_v3', JSON.stringify(leitnerCards));
+  }
+
+  function renderLeitner() {
+    for (let b = 1; b <= 5; b++) {
+      const count = leitnerCards.filter(c => c.box === b).length;
+      document.getElementById(`count-b${b}`).innerText = count;
+    }
+    const listEl = document.getElementById('leitner-list');
+    listEl.innerHTML = leitnerCards.map(c => `
+      <div class="leitner-card">
+        <div class="leitner-card-info">
+          <div class="phrase">${c.en} <span style="font-size:0.72rem; color:#fbbf24;">[باکس ${c.box}]</span></div>
+          <div class="phonetic">${c.phonetic}</div>
+          <div class="meaning">${c.fa}</div>
+        </div>
+        <div class="leitner-actions">
+          <button class="btn-mini" onclick="speakBritish('${c.en.replace(/'/g, "\\'")}', 1.0, 0.95)">🔊</button>
+          <button class="btn-mini promote" onclick="promoteCard('${c.id}')">🎙️ تمرین (+باکس)</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // ۶. موتور صدای محیطی واقعی (Web Audio API Noise Generator بدون نیاز به فایل خارجی)
+  function toggleAmbientNoise() {
+    const btn = document.getElementById('btn-noise');
+    if (!ambientCtx) {
+      ambientCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const bufferSize = 2 * ambientCtx.sampleRate;
+      const noiseBuffer = ambientCtx.createBuffer(1, bufferSize, ambientCtx.sampleRate);
+      const output = noiseBuffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        output[i] = Math.random() * 2 - 1;
+      }
+      const whiteNoise = ambientCtx.createBufferSource();
+      whiteNoise.buffer = noiseBuffer;
+      whiteNoise.loop = true;
+
+      const filter = ambientCtx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.value = 650;
+
+      const gain = ambientCtx.createGain();
+      gain.gain.value = 0.035;
+
+      whiteNoise.connect(filter);
+      filter.connect(gain);
+      gain.connect(ambientCtx.destination);
+      whiteNoise.start(0);
+      ambientNode = ambientCtx;
+      btn.innerText = "🌧️ صدای محیط لندن: روشن";
+    } else {
+      ambientCtx.close();
+      ambientCtx = null;
+      btn.innerText = "🌧️ صدای محیط لندن: خاموش";
+    }
+  }
+
+  // ۷. کارنامه وایرال پایان جلسه
+  function generateViralReceipt() {
+    const level = document.getElementById('ui-level').innerText;
+    alert(
+      `🇬🇧 BRITISH SURVIVAL RECEIPT 🇬🇧\n` +
+      `----------------------------------\n` +
+      `• سطح تشخیصی سر میز صبحانه: ${level}\n` +
+      `• اعتماد خانواده تام (Trust): ${trustScore}%\n` +
+      `• عبارات شکارشده در لایتنر: ${leitnerCards.length} عبارت\n` +
+      `• نظر تام: "Not bad at all, mate! You survived breakfast with my lot!"`
+    );
+  }
+
+  window.speechSynthesis.onvoiceschanged = () => {};
+  renderLeitner();
+</script>
+</body>
+</html>
